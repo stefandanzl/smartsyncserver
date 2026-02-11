@@ -1,0 +1,37 @@
+# SmartSyncServer Configuration
+
+vault:
+  path: ./vault
+
+# Git integration (optional)
+git:
+  # autocommit_minutes: 60
+  # access_token: your-github-token
+  # repository_url: https://github.com/username/repo.git
+  # commit_message: Automatic SmartSyncServer commit
+
+# Scan settings
+scan:
+  on_startup: true       # Scan vault when server starts
+  api: true             # Update checksums on API changes
+  on_change: false      # Watch for filesystem changes (not implemented yet)
+  periodic_interval: 300  # Periodic scan interval in seconds (0 = disabled)
+
+# Ignore patterns (glob-style)
+ignore:
+  - ".obsidian/workspace*"
+  - ".obsidian/cache"
+  - ".DS_Store"
+  - ".trash/**"
+  - "*.tmp"
+  - "*.swp"
+
+# Authentication
+auth:
+  type: none           # 'token' or 'none' (for dev)
+  # token: your-secret-token-here
+
+# Server settings
+server:
+  port: 8080
+  bind: 0.0.0.0
