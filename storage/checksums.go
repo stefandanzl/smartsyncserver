@@ -114,10 +114,16 @@ func (c *Checksums) Delete(path string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	delete(c.data, path)
+	// Normalize: if deleting a directory, ensure trailing slash
+	deletePath := path
+	if c.data[path+"/"] == "dir" {
+		deletePath = path + "/"
+	}
+	delete(c.data, deletePath)
+
 	// Also remove any nested paths if this was a directory
 	for p := range c.data {
-		if stringsHasPrefix(p, path+"/") {
+		if stringsHasPrefix(p, deletePath) && p != deletePath {
 			delete(c.data, p)
 		}
 	}
@@ -128,23 +134,34 @@ func (c *Checksums) Rename(from, to string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Normalize paths for directories (ensure trailing slash)
+	fromPath := from
+	toPath := to
+	if c.data[from+"/"] == "dir" {
+		fromPath = from + "/"
+	}
+	// Ensure destination has trailing slash if source was a directory
+	if strings.HasSuffix(fromPath, "/") && !strings.HasSuffix(toPath, "/") {
+		toPath += "/"
+	}
+
 	// Direct file/folder rename
-	if checksum, ok := c.data[from]; ok {
-		c.data[to] = checksum
-		delete(c.data, from)
+	if checksum, ok := c.data[fromPath]; ok {
+		c.data[toPath] = checksum
+		delete(c.data, fromPath)
 	}
 
 	// Rename nested paths
 	for path, checksum := range c.data {
-		if stringsHasPrefix(path, from+"/") {
-			newPath := to + path[len(from):]
+		if stringsHasPrefix(path, fromPath) && path != fromPath {
+			newPath := toPath + path[len(fromPath):]
 			c.data[newPath] = checksum
 			delete(c.data, path)
 		}
 	}
 }
 
-// Scan walks the vault and updates checksums for all files
+// Scan walks the vault and updates checksums for all files and directories
 func (c *Checksums) Scan() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -156,18 +173,6 @@ func (c *Checksums) Scan() error {
 			return err
 		}
 
-		// Skip directories
-		if info.IsDir() {
-			// Check if directory should be ignored
-			relPath, err := filepath.Rel(c.vaultPath, fullPath)
-			if err == nil && c.matcher != nil {
-				if c.matcher.MatchDir(filepath.ToSlash(relPath)) {
-					return filepath.SkipDir
-				}
-			}
-			return nil
-		}
-
 		// Get relative path
 		relPath, err := filepath.Rel(c.vaultPath, fullPath)
 		if err != nil {
@@ -177,11 +182,24 @@ func (c *Checksums) Scan() error {
 		// Normalize path separators
 		relPath = filepath.ToSlash(relPath)
 
-		// Check if file should be ignored
-		if c.matcher != nil && c.matcher.Match(relPath) {
-			if info.IsDir() {
+		// Skip vault root directory
+		if relPath == "." {
+			return nil
+		}
+
+		// Handle directories
+		if info.IsDir() {
+			// Check if directory should be ignored
+			if c.matcher != nil && c.matcher.MatchDir(relPath) {
 				return filepath.SkipDir
 			}
+			// Add directory with pseudo-hash "dir" (paths end with /)
+			newData[relPath+"/"] = "dir"
+			return nil
+		}
+
+		// Check if file should be ignored
+		if c.matcher != nil && c.matcher.Match(relPath) {
 			return nil
 		}
 
@@ -224,6 +242,19 @@ func (c *Checksums) UpdateForFile(relPath string) error {
 	}
 
 	c.data[relPath] = checksum
+	return c.saveLocked()
+}
+
+// AddDir adds a directory entry with the "dir" pseudo-hash (path ends with /)
+func (c *Checksums) AddDir(relPath string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Ensure trailing slash for directories
+	if !strings.HasSuffix(relPath, "/") {
+		relPath += "/"
+	}
+	c.data[relPath] = "dir"
 	return c.saveLocked()
 }
 

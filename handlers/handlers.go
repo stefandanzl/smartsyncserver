@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -136,6 +137,13 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// URL-decode path
+	path, err := url.PathUnescape(path)
+	if err != nil {
+		s.writeError(w, "Invalid path encoding", http.StatusBadRequest)
+		return
+	}
+
 	// Normalize path
 	path = filepath.ToSlash(path)
 
@@ -225,6 +233,13 @@ func (s *Server) handleFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// URL-decode path
+	path, err := url.PathUnescape(path)
+	if err != nil {
+		s.writeError(w, "Invalid path encoding", http.StatusBadRequest)
+		return
+	}
+
 	// Normalize path
 	path = filepath.ToSlash(path)
 
@@ -244,6 +259,9 @@ func (s *Server) handleCreateFolder(w http.ResponseWriter, r *http.Request, path
 		s.writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Add directory entry to checksums
+	_ = s.checksums.AddDir(path)
 
 	s.writeJSON(w, map[string]bool{"created": true}, http.StatusOK)
 }
