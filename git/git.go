@@ -72,40 +72,57 @@ func (m *Manager) Init() error {
 	return err
 }
 
+// CommitResult contains details about a commit operation
+type CommitResult struct {
+	Success    bool   `json:"success"`
+	HasChanges bool   `json:"has_changes"`
+	Files      []string `json:"files_changed,omitempty"`
+	CommitHash string `json:"commit_hash,omitempty"`
+	Pushed      bool   `json:"pushed"`
+	PushError   string `json:"push_error,omitempty"`
+	Message     string `json:"message"`
+}
+
 // Commit creates a git commit with all changes
-func (m *Manager) Commit() error {
+func (m *Manager) Commit() *CommitResult {
 	if m == nil {
-		return nil
+		return &CommitResult{Success: true, Message: "Git not configured"}
 	}
 
 	repo, err := git.PlainOpen(m.vaultPath)
 	if err != nil {
-		return fmt.Errorf("failed to open repository: %w", err)
+		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to open repository: %v", err)}
 	}
 
 	worktree, err := repo.Worktree()
 	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
+		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to get worktree: %v", err)}
 	}
 
 	// Add all changes
 	_, err = worktree.Add(".")
 	if err != nil {
-		return fmt.Errorf("failed to stage changes: %w", err)
+		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to stage changes: %v", err)}
 	}
 
 	// Check if there are changes to commit
 	status, err := worktree.Status()
 	if err != nil {
-		return fmt.Errorf("failed to get status: %w", err)
+		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to get status: %v", err)}
 	}
 
 	if status.IsClean() {
-		return nil // Nothing to commit
+		return &CommitResult{Success: true, HasChanges: false, Message: "No changes to commit"}
+	}
+
+	// Collect changed files (status is a map[filePath]FileStatus)
+	var files []string
+	for path := range status {
+		files = append(files, path)
 	}
 
 	// Create commit
-	_, err = worktree.Commit(m.commitMsg, &git.CommitOptions{
+	commit, err := worktree.Commit(m.commitMsg, &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  "SmartSyncServer",
 			Email: "smartsyncserver@local",
@@ -113,11 +130,84 @@ func (m *Manager) Commit() error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to commit: %w", err)
+		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to commit: %v", err)}
 	}
 
 	// Push changes
-	return m.Push()
+	if err := m.Push(); err != nil {
+		return &CommitResult{
+			Success:    true,
+			HasChanges: true,
+			Files:      files,
+			CommitHash: commit.String(),
+			Pushed:      false,
+			PushError:   err.Error(),
+			Message:     "Committed locally but push failed",
+		}
+	}
+
+	return &CommitResult{
+		Success:    true,
+		HasChanges: true,
+		Files:      files,
+		CommitHash: commit.String(),
+		Pushed:      true,
+		Message:     "Changes committed and pushed",
+	}
+}
+
+// PullResult contains details about a pull operation
+type PullResult struct {
+	Success    bool   `json:"success"`
+	Updated    bool   `json:"updated"`
+	UpToDate   bool   `json:"up_to_date"`
+	Conflicted bool   `json:"conflicted"`
+	Message    string `json:"message"`
+	Error      string `json:"error,omitempty"`
+}
+
+// PullDetailed pulls changes and returns detailed result
+func (m *Manager) PullDetailed() *PullResult {
+	if m == nil {
+		return &PullResult{Success: true, UpToDate: true, Message: "Git not configured"}
+	}
+
+	repo, err := git.PlainOpen(m.vaultPath)
+	if err != nil {
+		return &PullResult{Success: false, Message: fmt.Sprintf("failed to open repository: %v", err)}
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return &PullResult{Success: false, Message: fmt.Sprintf("failed to get worktree: %v", err)}
+	}
+
+	auth := &http.BasicAuth{
+		Username: "oauth2",
+		Password: m.accessToken,
+	}
+
+	err = worktree.Pull(&git.PullOptions{
+		Auth:    auth,
+		Progress: nil,
+		Force:    true,
+	})
+
+	// Handle case where there's nothing to pull
+	if err == git.NoErrAlreadyUpToDate {
+		return &PullResult{Success: true, UpToDate: true, Message: "Already up to date"}
+	}
+
+	if err != nil {
+		return &PullResult{Success: false, Message: "Pull failed", Error: err.Error()}
+	}
+
+	// Pull succeeded without conflict
+	return &PullResult{
+		Success: true,
+		Updated: true,
+		Message: "Pull successful",
+	}
 }
 
 // Push pushes commits to the remote repository

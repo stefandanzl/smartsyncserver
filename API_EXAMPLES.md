@@ -114,6 +114,43 @@ curl http://127.0.0.1:8080/status
 
 ---
 
+## 9. Create git snapshot (POST /snapshot)
+
+```bash
+curl -X POST http://127.0.0.1:8080/snapshot
+
+# Expected response (success):
+# {"success":true,"has_changes":true,"files_changed":["notes/hello.md"],"commit_hash":"abc123...","pushed":true,"message":"Changes committed and pushed"}
+
+# Expected response (no changes):
+# {"success":true,"has_changes":false,"message":"No changes to commit"}
+
+# Expected response (git not configured):
+# {"success":true,"message":"Git not configured"}
+```
+
+---
+
+## 10. Pull from remote (POST /git/pull)
+
+```bash
+curl -X POST http://127.0.0.1:8080/git/pull
+
+# Expected response (pulled successfully):
+# {"success":true,"updated":true,"message":"Pull successful"}
+
+# Expected response (already up to date):
+# {"success":true,"up_to_date":true,"message":"Already up to date"}
+
+# Expected response (conflicts detected):
+# {"success":false,"updated":true,"conflicted":true,"message":"Pulled but conflicts detected - please resolve manually"}
+
+# Expected response (error):
+# {"success":false,"message":"Pull failed","error":"..."}
+```
+
+---
+
 ## With Authentication (if enabled in config)
 
 ```bash

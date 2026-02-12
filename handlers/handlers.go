@@ -41,6 +41,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	// Register specific routes (more specific routes first)
 	mux.HandleFunc("/status", s.handleStatus)
 	mux.HandleFunc("/checksums", s.handleChecksums)
+	mux.HandleFunc("/snapshot", s.handleSnapshot)
+	mux.HandleFunc("/git/pull", s.handleGitPull)
 	mux.HandleFunc("/file/", s.handleFile)
 	mux.HandleFunc("/folder/", s.handleFolder)
 	mux.HandleFunc("/rename", s.handleRename)
@@ -94,6 +96,36 @@ func (s *Server) handleScanChecksums(w http.ResponseWriter, r *http.Request) {
 		"checksums":   allChecksums,
 	}
 	s.writeJSON(w, response, http.StatusOK)
+}
+
+// handleSnapshot creates a git commit and pushes to remote
+func (s *Server) handleSnapshot(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	result := s.git.Commit()
+	if result.Success {
+		s.writeJSON(w, result, http.StatusOK)
+	} else {
+		s.writeJSON(w, result, http.StatusInternalServerError)
+	}
+}
+
+// handleGitPull pulls changes from remote repository
+func (s *Server) handleGitPull(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	result := s.git.PullDetailed()
+	if result.Success {
+		s.writeJSON(w, result, http.StatusOK)
+	} else {
+		s.writeJSON(w, result, http.StatusInternalServerError)
+	}
 }
 
 // handleFile handles all file operations

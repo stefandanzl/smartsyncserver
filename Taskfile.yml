@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-  BINARY: build/smartsyncserver.exe
+  BINARY: smartsyncserver.exe
 
 tasks:
   default:
@@ -18,10 +18,11 @@ tasks:
 
   run:
     desc: Start the server
+    dir: test-vault
     deps:
       - build
     cmds:
-      - "{{.BINARY}}"
+      - cmd: ./"{{.BINARY}}"
 
   clean:
     desc: Clean build artifacts
