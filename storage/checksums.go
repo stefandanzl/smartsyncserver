@@ -56,11 +56,8 @@ func (c *Checksums) Load() error {
 	return nil
 }
 
-// Save writes the checksums to disk
-func (c *Checksums) Save() error {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+// saveLocked writes checksums to disk without acquiring locks (caller must hold lock)
+func (c *Checksums) saveLocked() error {
 	data, err := json.MarshalIndent(c.data, "", "  ")
 	if err != nil {
 		return err
@@ -73,6 +70,13 @@ func (c *Checksums) Save() error {
 	}
 
 	return os.Rename(tmpPath, c.path)
+}
+
+// Save writes the checksums to disk
+func (c *Checksums) Save() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.saveLocked()
 }
 
 // Get returns the checksum for a given path
@@ -196,7 +200,7 @@ func (c *Checksums) Scan() error {
 	}
 
 	c.data = newData
-	return c.Save()
+	return c.saveLocked()
 }
 
 // GetFileCount returns the number of tracked files
@@ -209,6 +213,9 @@ func (c *Checksums) GetFileCount() int {
 
 // UpdateForFile calculates and stores the checksum for a specific file
 func (c *Checksums) UpdateForFile(relPath string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	fullPath := filepath.Join(c.vaultPath, relPath)
 
 	checksum, err := calculateFileChecksum(fullPath)
@@ -216,8 +223,8 @@ func (c *Checksums) UpdateForFile(relPath string) error {
 		return err
 	}
 
-	c.Set(relPath, checksum)
-	return c.Save()
+	c.data[relPath] = checksum
+	return c.saveLocked()
 }
 
 // calculateFileChecksum computes the SHA256 hash of a file

@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(go mod tidy:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(task build:*)",
+      "mcp__yaak__list_workspaces",
+      "mcp__yaak__list_folders",
+      "mcp__yaak__list_http_requests",
+      "mcp__yaak__create_folder",
+      "mcp__yaak__create_http_request"
     ]
   }
 }

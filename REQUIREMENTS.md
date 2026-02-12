@@ -199,6 +199,14 @@ Server should update this file whenever:
 - A file is renamed
   This is dependent on the `scan` setting in `config.yaml`
 
+The checksums structure can be retrieved with
+
+GET /checksums
+
+there should also be an endpoint to manually trigger checking and checksum return
+
+PUT /checksums
+
 # 6. Git Tracking
 
 If settings are provided in config.yaml use Go-git package and according to settings perform git commits
