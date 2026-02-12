@@ -21,7 +21,7 @@ checksums.json
 
 # Build and test
 build/
-test-vault/
+#test-vault/
 
 # Config (keep example)
 config.yaml

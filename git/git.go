@@ -14,13 +14,13 @@ import (
 
 // Manager handles git operations
 type Manager struct {
-	repoURL    string
+	repoURL     string
 	accessToken string
-	vaultPath  string
-	commitMsg  string
-	interval   time.Duration
-	ctx        context.Context
-	cancel     context.CancelFunc
+	vaultPath   string
+	commitMsg   string
+	interval    time.Duration
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 // NewManager creates a new git manager
@@ -32,13 +32,13 @@ func NewManager(repoURL, accessToken, vaultPath, commitMsg string, intervalMinut
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Manager{
-		repoURL:    repoURL,
+		repoURL:     repoURL,
 		accessToken: accessToken,
-		vaultPath:  vaultPath,
-		commitMsg:  commitMsg,
-		interval:   time.Duration(intervalMinutes) * time.Minute,
-		ctx:        ctx,
-		cancel:     cancel,
+		vaultPath:   vaultPath,
+		commitMsg:   commitMsg,
+		interval:    time.Duration(intervalMinutes) * time.Minute,
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 }
 
@@ -74,19 +74,19 @@ func (m *Manager) Init() error {
 
 // CommitResult contains details about a commit operation
 type CommitResult struct {
-	Success    bool   `json:"success"`
-	HasChanges bool   `json:"has_changes"`
+	Success    bool     `json:"success"`
+	HasChanges bool     `json:"has_changes"`
 	Files      []string `json:"files_changed,omitempty"`
-	CommitHash string `json:"commit_hash,omitempty"`
-	Pushed      bool   `json:"pushed"`
-	PushError   string `json:"push_error,omitempty"`
-	Message     string `json:"message"`
+	CommitHash string   `json:"commit_hash,omitempty"`
+	Pushed     bool     `json:"pushed"`
+	PushError  string   `json:"push_error,omitempty"`
+	Message    string   `json:"message"`
 }
 
 // Commit creates a git commit with all changes
 func (m *Manager) Commit() *CommitResult {
 	if m == nil {
-		return &CommitResult{Success: true, Message: "Git not configured"}
+		return &CommitResult{Success: false, Message: "Git not configured"}
 	}
 
 	repo, err := git.PlainOpen(m.vaultPath)
@@ -140,9 +140,9 @@ func (m *Manager) Commit() *CommitResult {
 			HasChanges: true,
 			Files:      files,
 			CommitHash: commit.String(),
-			Pushed:      false,
-			PushError:   err.Error(),
-			Message:     "Committed locally but push failed",
+			Pushed:     false,
+			PushError:  err.Error(),
+			Message:    "Committed locally but push failed",
 		}
 	}
 
@@ -151,8 +151,8 @@ func (m *Manager) Commit() *CommitResult {
 		HasChanges: true,
 		Files:      files,
 		CommitHash: commit.String(),
-		Pushed:      true,
-		Message:     "Changes committed and pushed",
+		Pushed:     true,
+		Message:    "Changes committed and pushed",
 	}
 }
 
@@ -188,7 +188,7 @@ func (m *Manager) PullDetailed() *PullResult {
 	}
 
 	err = worktree.Pull(&git.PullOptions{
-		Auth:    auth,
+		Auth:     auth,
 		Progress: nil,
 		Force:    true,
 	})
@@ -263,7 +263,7 @@ func (m *Manager) Pull() error {
 	}
 
 	err = worktree.Pull(&git.PullOptions{
-		Auth:    auth,
+		Auth:     auth,
 		Progress: nil,
 		Force:    true,
 	})

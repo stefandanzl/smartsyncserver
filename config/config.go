@@ -28,9 +28,9 @@ type GitConfig struct {
 }
 
 type ScanConfig struct {
-	OnStartup       bool `yaml:"on_startup"`
-	API             bool `yaml:"api"`
-	OnChange        bool `yaml:"on_change"`
+	OnStartup        bool `yaml:"on_startup"`
+	API              bool `yaml:"api"`
+	OnChange         bool `yaml:"on_change"`
 	PeriodicInterval int  `yaml:"periodic_interval"`
 }
 
@@ -66,9 +66,9 @@ func Load(path string) (*Config, error) {
 	if cfg.Server.Bind == "" {
 		cfg.Server.Bind = "0.0.0.0"
 	}
-	if cfg.Scan.PeriodicInterval == 0 {
-		cfg.Scan.PeriodicInterval = 300
-	}
+	// if cfg.Scan.PeriodicInterval == 0 {
+	// 	cfg.Scan.PeriodicInterval = 300
+	// }
 	if cfg.Git.CommitMessage == "" {
 		cfg.Git.CommitMessage = "Automatic SmartSyncServer commit"
 	}
@@ -88,15 +88,16 @@ func (c *Config) IsGitEnabled() bool {
 
 // GetDefaultIgnorePatterns returns default ignore patterns if none specified
 func (c *Config) GetDefaultIgnorePatterns() []string {
-	if len(c.Ignore) == 0 {
-		return []string{
-			".obsidian/workspace*",
-			".obsidian/cache",
-			".DS_Store",
-			".trash/**",
-			"*.tmp",
-			"*.swp",
-		}
-	}
+	// if len(c.Ignore) == 0 {
+	// 	return []string{
+	// 		".obsidian/workspace*",
+	// 		".obsidian/cache",
+	// 		".DS_Store",
+	// 		".trash/**",
+	// 		"*.tmp",
+	// 		"*.swp",
+	// 	}
+
+	// }
 	return c.Ignore
 }

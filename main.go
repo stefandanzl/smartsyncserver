@@ -117,6 +117,7 @@ func main() {
 	// Start periodic scanner if enabled
 	if cfg.Scan.PeriodicInterval > 0 {
 		go startPeriodicScan(checksums, cfg.Scan.PeriodicInterval, gitMgr)
+		// go startPeriodicCommit(checksums, cfg.Git.AutocommitMinutes, gitMgr)
 		log.Printf("Periodic scan started (interval: %d seconds)", cfg.Scan.PeriodicInterval)
 	}
 
@@ -145,7 +146,8 @@ func main() {
 		if gitMgr != nil {
 			gitMgr.Stop()
 			// Try to commit before shutdown
-			_ = gitMgr.Commit()
+			//bad idea!!!
+			// _ = gitMgr.Commit()
 		}
 
 		_ = srv.Shutdown(ctx)
@@ -170,11 +172,22 @@ func startPeriodicScan(checksums *storage.Checksums, intervalSeconds int, gitMgr
 			log.Printf("Periodic scan complete: %d files", checksums.GetFileCount())
 		}
 
-		// Commit changes to git if enabled
-		if gitMgr != nil {
-			if err := gitMgr.Commit(); err != nil {
-				log.Printf("Git commit error: %v", err)
-			}
-		}
 	}
 }
+
+// // startPeriodicCommit runs periodic vault commits
+// func startPeriodicCommit(checksums *storage.Checksums, intervalMinutes int, gitMgr *git.Manager) {
+// 	ticker := time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
+// 	defer ticker.Stop()
+
+// 	for range ticker.C {
+
+// 		// Commit changes to git if enabled
+// 		// we only want commits on defined period
+// 		if gitMgr != nil {
+// 			if err := gitMgr.Commit(); err.Success != true {
+// 				log.Printf("Git commit error: %v", err.Message)
+// 			}
+// 		}
+// 	}
+// }
