@@ -26,7 +26,7 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/smartsyncserver .
-COPY config.example.yaml /data/config.yaml
+COPY config.example.yaml /app/config.yaml
 
 # Create vault directory
 RUN mkdir /vault

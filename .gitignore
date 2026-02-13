@@ -16,7 +16,8 @@ smartsyncserver
 go.work
 
 # Vault data
-vault/
+vault
+data
 checksums.json
 
 # Build and test

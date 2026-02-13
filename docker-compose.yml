@@ -7,8 +7,9 @@ services:
       - "8080:8080"
     volumes:
       # Mount vault data directory
-      - ./docker/vault:/vault
+      - ./vault:/vault
       # Mount config file (create this locally first)
-      - ./docker/data:/data
+      - ./config.yaml:/app/config.yaml:ro
+      # - ./checksums.json:/app/checksums.json:ro
       # Only mount if you want to manually replace executable
       # - ./docker/app:/app

@@ -20,7 +20,7 @@ import (
 
 func main() {
 	// Load configuration
-	cfg, err := config.Load("/data/config.yaml")
+	cfg, err := config.Load("config.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -36,7 +36,7 @@ func main() {
 
 	// Initialize checksums manager
 	// execDir, _ := os.Executable()
-	checksumsPath := "/data/checksums.json" // filepath.Join(filepath.Dir(execDir), "checksums.json")
+	checksumsPath := "checksums.json" // filepath.Join(filepath.Dir(execDir), "checksums.json")
 	checksums := storage.NewChecksums(checksumsPath, cfg.Vault.Path, ignoreMatcher)
 
 	wd, _ := os.Getwd()
