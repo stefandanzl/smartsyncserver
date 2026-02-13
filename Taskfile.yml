@@ -75,3 +75,9 @@ tasks:
     desc: Run in Docker
     cmds:
       - docker run -p 8080:8080 -v {{.PWD}}/test-vault:/data/vault smartsyncserver
+
+  build-exe-docker:
+    desc: Build the server binary
+    cmds:
+      # - mkdir -p build
+      - GOOS=linux go build -o ./docker/app/smartsyncserver .

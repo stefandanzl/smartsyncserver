@@ -12,23 +12,18 @@ git:
 
 # Scan settings
 scan:
-  on_startup: true       # Scan vault when server starts
-  api: true             # Update checksums on API changes
-  on_change: false      # Watch for filesystem changes (not implemented yet)
-  periodic_interval: 300  # Periodic scan interval in seconds (0 = disabled)
+  on_startup: true # Scan vault when server starts
+  api: true # Update checksums on API changes
+  on_change: false # Watch for filesystem changes (not implemented yet)
+  periodic_interval: 300 # Periodic scan interval in seconds (0 = disabled)
 
 # Ignore patterns (glob-style)
 ignore:
-  - ".obsidian/workspace*"
-  - ".obsidian/cache"
-  - ".DS_Store"
-  - ".trash/**"
-  - "*.tmp"
-  - "*.swp"
+  - ".git"
 
 # Authentication
 auth:
-  type: none           # 'token' or 'none' (for dev)
+  type: none # 'token' or 'none' (for dev)
   # token: your-secret-token-here
 
 # Server settings

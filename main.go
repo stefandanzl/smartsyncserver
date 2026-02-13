@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -21,7 +20,7 @@ import (
 
 func main() {
 	// Load configuration
-	cfg, err := config.Load("config.yaml")
+	cfg, err := config.Load("/data/config.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -36,8 +35,13 @@ func main() {
 	ignoreMatcher := ignore.New(ignorePatterns)
 
 	// Initialize checksums manager
-	checksumsPath := filepath.Join(filepath.Dir(cfg.Vault.Path), "checksums.json")
+	// execDir, _ := os.Executable()
+	checksumsPath := "/data/checksums.json" // filepath.Join(filepath.Dir(execDir), "checksums.json")
 	checksums := storage.NewChecksums(checksumsPath, cfg.Vault.Path, ignoreMatcher)
+
+	wd, _ := os.Getwd()
+	log.Printf("Working directory: %s", wd)
+	log.Printf("Checksums path: %s", checksumsPath)
 
 	// Scan on startup if enabled
 	if cfg.Scan.OnStartup {
