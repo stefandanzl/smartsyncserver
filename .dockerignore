@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+LICENSE
+
+# Test files
+test-vault
+test.ps1
+test.sh
+Taskfile.yml
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
