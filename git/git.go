@@ -14,13 +14,15 @@ import (
 
 // Manager handles git operations
 type Manager struct {
-	repoURL     string
-	accessToken string
-	vaultPath   string
-	commitMsg   string
-	interval    time.Duration
-	ctx         context.Context
-	cancel      context.CancelFunc
+	repoURL      string
+	accessToken   string
+	vaultPath    string
+	commitMsg    string
+	interval     time.Duration
+	ctx          context.Context
+	cancel       context.CancelFunc
+	lastError    string
+	lastErrorTime time.Time
 }
 
 // NewManager creates a new git manager
@@ -91,27 +93,37 @@ func (m *Manager) Commit() *CommitResult {
 
 	repo, err := git.PlainOpen(m.vaultPath)
 	if err != nil {
-		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to open repository: %v", err)}
+		m.lastError = fmt.Sprintf("failed to open repository: %v", err)
+		m.lastErrorTime = time.Now()
+		return &CommitResult{Success: false, Message: m.lastError}
 	}
 
 	worktree, err := repo.Worktree()
 	if err != nil {
-		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to get worktree: %v", err)}
+		m.lastError = fmt.Sprintf("failed to get worktree: %v", err)
+		m.lastErrorTime = time.Now()
+		return &CommitResult{Success: false, Message: m.lastError}
 	}
 
 	// Add all changes
 	_, err = worktree.Add(".")
 	if err != nil {
-		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to stage changes: %v", err)}
+		m.lastError = fmt.Sprintf("failed to stage changes: %v", err)
+		m.lastErrorTime = time.Now()
+		return &CommitResult{Success: false, Message: m.lastError}
 	}
 
 	// Check if there are changes to commit
 	status, err := worktree.Status()
 	if err != nil {
-		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to get status: %v", err)}
+		m.lastError = fmt.Sprintf("failed to get status: %v", err)
+		m.lastErrorTime = time.Now()
+		return &CommitResult{Success: false, Message: m.lastError}
 	}
 
 	if status.IsClean() {
+		// Clear error on success
+		m.lastError = ""
 		return &CommitResult{Success: true, HasChanges: false, Message: "No changes to commit"}
 	}
 
@@ -130,7 +142,9 @@ func (m *Manager) Commit() *CommitResult {
 		},
 	})
 	if err != nil {
-		return &CommitResult{Success: false, Message: fmt.Sprintf("failed to commit: %v", err)}
+		m.lastError = fmt.Sprintf("failed to commit: %v", err)
+		m.lastErrorTime = time.Now()
+		return &CommitResult{Success: false, Message: m.lastError}
 	}
 
 	// Push changes
@@ -146,6 +160,8 @@ func (m *Manager) Commit() *CommitResult {
 		}
 	}
 
+	// Clear error on success
+	m.lastError = ""
 	return &CommitResult{
 		Success:    true,
 		HasChanges: true,
@@ -174,12 +190,16 @@ func (m *Manager) PullDetailed() *PullResult {
 
 	repo, err := git.PlainOpen(m.vaultPath)
 	if err != nil {
-		return &PullResult{Success: false, Message: fmt.Sprintf("failed to open repository: %v", err)}
+		m.lastError = fmt.Sprintf("failed to open repository: %v", err)
+		m.lastErrorTime = time.Now()
+		return &PullResult{Success: false, Message: m.lastError}
 	}
 
 	worktree, err := repo.Worktree()
 	if err != nil {
-		return &PullResult{Success: false, Message: fmt.Sprintf("failed to get worktree: %v", err)}
+		m.lastError = fmt.Sprintf("failed to get worktree: %v", err)
+		m.lastErrorTime = time.Now()
+		return &PullResult{Success: false, Message: m.lastError}
 	}
 
 	auth := &http.BasicAuth{
@@ -195,14 +215,19 @@ func (m *Manager) PullDetailed() *PullResult {
 
 	// Handle case where there's nothing to pull
 	if err == git.NoErrAlreadyUpToDate {
+		// Clear error on success
+		m.lastError = ""
 		return &PullResult{Success: true, UpToDate: true, Message: "Already up to date"}
 	}
 
 	if err != nil {
-		return &PullResult{Success: false, Message: "Pull failed", Error: err.Error()}
+		m.lastError = fmt.Sprintf("Pull failed: %v", err)
+		m.lastErrorTime = time.Now()
+		return &PullResult{Success: false, Message: m.lastError}
 	}
 
-	// Pull succeeded without conflict
+	// Clear error on success
+	m.lastError = ""
 	return &PullResult{
 		Success: true,
 		Updated: true,
@@ -396,4 +421,12 @@ func stringSliceContains(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// GetLastError returns the last git error (empty string if no error or last operation succeeded)
+func (m *Manager) GetLastError() string {
+	if m == nil {
+		return ""
+	}
+	return m.lastError
 }

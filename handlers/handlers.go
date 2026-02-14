@@ -59,6 +59,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"online":       true,
 		"file_count":   s.checksums.GetFileCount(),
 		"auth_success": !s.auth.IsEnabled() || s.auth.ValidateRequest(r),
+		"git_error":    s.git != nil && s.git.GetLastError() != "",
 	}
 	s.writeJSON(w, response, http.StatusOK)
 }
