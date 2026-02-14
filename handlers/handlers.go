@@ -49,8 +49,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/rename", s.handleRename)
 
 	// Catch-all for auth middleware (applied to everything)
-	// handler := s.auth.Handler(mux)
-	// mux.Handle("/", handler)
+	handler := s.auth.Handler(mux)
+	mux.Handle("/", handler)
 }
 
 // handleStatus returns server status (no auth required)
@@ -93,8 +93,8 @@ func (s *Server) handleScanChecksums(w http.ResponseWriter, r *http.Request) {
 	allChecksums := s.checksums.GetAll()
 	response := map[string]interface{}{
 		"scanned":    true,
-		"file_count":  len(allChecksums),
-		"checksums":   allChecksums,
+		"file_count": len(allChecksums),
+		"checksums":  allChecksums,
 	}
 	s.writeJSON(w, response, http.StatusOK)
 }

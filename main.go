@@ -102,21 +102,8 @@ func main() {
 	mux := http.NewServeMux()
 	server.RegisterRoutes(mux)
 
-	// Add CORS support (optional, useful for development)
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		// Call the actual handler
-		server.RegisterRoutes(http.NewServeMux())
-	})
+	// Wrap with auth middleware (which includes CORS)
+	handler := authMiddleware.Handler(mux)
 
 	// Start periodic scanner if enabled
 	if cfg.Scan.PeriodicInterval > 0 {
@@ -131,7 +118,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
