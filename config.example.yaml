@@ -19,12 +19,11 @@ scan:
 
 # Ignore patterns (glob-style)
 ignore:
-  - ".git"
+  - ".git*"
 
-# Authentication
+# Authentication (leave token empty to disable auth)
 auth:
-  type: none # 'token' or 'none' (for dev)
-  # token: your-secret-token-here
+  token: your-secret-token-here
 
 # Server settings
 server:

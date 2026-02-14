@@ -35,7 +35,6 @@ type ScanConfig struct {
 }
 
 type AuthConfig struct {
-	Type  string `yaml:"type"`
 	Token string `yaml:"token"`
 }
 
@@ -78,7 +77,7 @@ func Load(path string) (*Config, error) {
 
 // IsAuthEnabled returns true if authentication is required
 func (c *Config) IsAuthEnabled() bool {
-	return c.Auth.Type == "token" && c.Auth.Token != ""
+	return c.Auth.Token != ""
 }
 
 // IsGitEnabled returns true if git integration is configured

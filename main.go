@@ -85,7 +85,7 @@ func main() {
 	}
 
 	// Initialize auth middleware
-	authMiddleware := auth.NewMiddleware(cfg.Auth.Type, cfg.Auth.Token)
+	authMiddleware := auth.NewMiddleware(cfg.Auth.Token)
 	if authMiddleware.IsEnabled() {
 		log.Println("Authentication enabled")
 	} else {

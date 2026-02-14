@@ -8,7 +8,8 @@
       "mcp__yaak__list_folders",
       "mcp__yaak__list_http_requests",
       "mcp__yaak__create_folder",
-      "mcp__yaak__create_http_request"
+      "mcp__yaak__create_http_request",
+      "Bash(task default:*)"
     ]
   }
 }

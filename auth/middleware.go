@@ -12,10 +12,10 @@ type Middleware struct {
 }
 
 // NewMiddleware creates a new authentication middleware
-func NewMiddleware(authType, token string) *Middleware {
+func NewMiddleware(token string) *Middleware {
 	return &Middleware{
 		token:   token,
-		enabled: authType == "token" && token != "",
+		enabled: token != "",
 	}
 }
 
@@ -61,4 +61,23 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 // IsEnabled returns true if authentication is enabled
 func (m *Middleware) IsEnabled() bool {
 	return m.enabled
+}
+
+// ValidateRequest checks if request has valid auth (without enforcing it)
+func (m *Middleware) ValidateRequest(r *http.Request) bool {
+	if !m.enabled {
+		return true // Auth disabled, so request is valid
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return false
+	}
+
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return false
+	}
+
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	return token == m.token
 }

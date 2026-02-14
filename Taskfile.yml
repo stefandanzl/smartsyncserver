@@ -8,20 +8,20 @@ tasks:
   default:
     desc: Do everything
     cmds:
-      # - task: build
+      - task: build
       - task: run
 
   build:
     desc: Build the server binary
     cmds:
       # - mkdir -p build
-      - go build -o {{.TEST_DIR}}/{{.BINARY}} .
+      - go build -o {{.BINARY}} .
 
   run:
     desc: Start the server
-    dir: test-vault
-    deps:
-      - build
+    # dir: test-vault
+    # deps:
+    #   - build
     cmds:
       - cmd: ./"{{.BINARY}}"
 

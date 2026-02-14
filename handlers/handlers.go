@@ -56,8 +56,9 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 // handleStatus returns server status (no auth required)
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
-		"online":     true,
-		"file_count": s.checksums.GetFileCount(),
+		"online":       true,
+		"file_count":   s.checksums.GetFileCount(),
+		"auth_success": !s.auth.IsEnabled() || s.auth.ValidateRequest(r),
 	}
 	s.writeJSON(w, response, http.StatusOK)
 }
