@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 alpine:latest
+FROM --platform=linux/arm64 alpine:latest
 
 # Install ca-certificates for HTTPS git operations
 RUN apk --no-cache add ca-certificates git
@@ -6,7 +6,7 @@ RUN apk --no-cache add ca-certificates git
 WORKDIR /app
 
 # Copy pre-built binary
-COPY build/smartsyncserver /app/smartsyncserver
+COPY build/smartsyncserver-arm64 /app/smartsyncserver
 COPY config.example.yaml /app/config.yaml
 
 # Create vault directory

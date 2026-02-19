@@ -47,6 +47,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/file/", s.handleFile)
 	mux.HandleFunc("/folder/", s.handleFolder)
 	mux.HandleFunc("/rename", s.handleRename)
+	mux.HandleFunc("/empty/", s.handleEmpty)
 
 	// Catch-all for auth middleware (applied to everything)
 	handler := s.auth.Handler(mux)
@@ -332,6 +333,34 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, map[string]bool{"renamed": true}, http.StatusOK)
+}
+
+// handleEmpty handles listing and cleaning empty folders
+func (s *Server) handleEmpty(w http.ResponseWriter, r *http.Request) {
+	// Check if it's the clean endpoint (POST /empty/clean)
+	if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/clean") {
+		removed, err := s.vault.CleanEmptyFolders()
+		if err != nil {
+			s.writeError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		s.writeJSON(w, map[string]any{"cleaned": removed, "count": removed}, http.StatusOK)
+		return
+	}
+
+	// GET /empty - list empty folders
+	if r.Method != http.MethodGet {
+		s.writeError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	emptyFolders, err := s.vault.ListEmptyFolders()
+	if err != nil {
+		s.writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.writeJSON(w, map[string]any{"empty_folders": emptyFolders, "count": len(emptyFolders)}, http.StatusOK)
 }
 
 // writeJSON writes a JSON response

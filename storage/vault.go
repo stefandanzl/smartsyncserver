@@ -192,6 +192,97 @@ func (v *Vault) FileExists(relPath string) bool {
 	return err == nil
 }
 
+// ListEmptyFolders returns a list of empty directories in the vault (respects ignore patterns)
+func (v *Vault) ListEmptyFolders() ([]string, error) {
+	var emptyDirs []string
+
+	err := filepath.Walk(v.path, func(fullPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		// Skip the vault root
+		if fullPath == v.path {
+			return nil
+		}
+
+		// Only check directories
+		if info.IsDir() {
+			// Get relative path for ignore matching
+			relPath, err := filepath.Rel(v.path, fullPath)
+			if err != nil {
+				return nil
+			}
+			relPath = filepath.ToSlash(relPath)
+
+			// Skip ignored directories
+			if v.matcher != nil && v.matcher.MatchDir(relPath) {
+				return filepath.SkipDir
+			}
+
+			// Check if directory is empty (no files or subdirs)
+			entries, err := os.ReadDir(fullPath)
+			if err != nil {
+				return nil
+			}
+			if len(entries) == 0 {
+				emptyDirs = append(emptyDirs, relPath)
+			}
+		}
+
+		return nil
+	})
+
+	return emptyDirs, err
+}
+
+// CleanEmptyFolders removes all empty directories from the vault (respects ignore patterns)
+func (v *Vault) CleanEmptyFolders() (int, error) {
+	removed := 0
+
+	err := filepath.Walk(v.path, func(fullPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		// Skip the vault root
+		if fullPath == v.path {
+			return nil
+		}
+
+		// Only check directories
+		if info.IsDir() {
+			// Get relative path for ignore matching
+			relPath, err := filepath.Rel(v.path, fullPath)
+			if err != nil {
+				return nil
+			}
+			relPath = filepath.ToSlash(relPath)
+
+			// Skip ignored directories
+			if v.matcher != nil && v.matcher.MatchDir(relPath) {
+				return filepath.SkipDir
+			}
+
+			// Check if directory is empty
+			entries, err := os.ReadDir(fullPath)
+			if err != nil {
+				return nil
+			}
+			if len(entries) == 0 {
+				// Remove the empty directory
+				if err := os.Remove(fullPath); err == nil {
+					removed++
+				}
+			}
+		}
+
+		return nil
+	})
+
+	return removed, err
+}
+
 // MimeType detects the MIME type of a file based on extension
 func MimeType(path string) string {
 	ext := strings.ToLower(filepath.Ext(path))

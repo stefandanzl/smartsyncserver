@@ -1,83 +1,125 @@
 version: "3"
 
 vars:
-  BINARY: smartsyncserver.exe
-  TEST_DIR: test-vault
+    BINARY: smartsyncserver.exe
+    TEST_DIR: test-vault
+
+env:
+    CGO_ENABLED: 0
 
 tasks:
-  default:
-    desc: Do everything
-    cmds:
-      - task: build
-      - task: run
+    default:
+        desc: Local development command
+        cmds:
+            - task: build
+            - task: run
 
-  build:
-    desc: Build the server binary
-    cmds:
-      # - mkdir -p build
-      - go build -o {{.BINARY}} .
+    build:
+        desc: Build the server binary for host system
+        cmds:
+            # - mkdir -p build
+            - go build -o {{.BINARY}} .
 
-  run:
-    desc: Start the server
-    # dir: test-vault
-    # deps:
-    #   - build
-    cmds:
-      - cmd: ./"{{.BINARY}}"
+    run:
+        desc: Start the server
+        # dir: test-vault
+        # deps:
+        #   - build
+        cmds:
+            - cmd: ./"{{.BINARY}}"
 
-  clean:
-    desc: Clean build artifacts
-    cmds:
-      - rm -rf build/
-      - rm -f checksums.json
+    clean:
+        desc: Clean build artifacts
+        cmds:
+            - rm -rf build/
+            - rm -f checksums.json
 
-  test-setup:
-    desc: Set up test environment
-    cmds:
-      - mkdir -p test-vault/data/notes test-vault/data/attachments
-      - mkdir -p test-vault/data/.obsidian
+    #### TESTS ####
+    test-setup:
+        desc: Set up test environment
+        cmds:
+            - mkdir -p test-vault/data/notes test-vault/data/attachments
+            - mkdir -p test-vault/data/.obsidian
 
-  test-status:
-    desc: Test GET /status endpoint
-    cmds:
-      - curl -s http://127.0.0.1:8080/status
+    test-status:
+        desc: Test GET /status endpoint
+        cmds:
+            - curl -s http://127.0.0.1:8080/status
 
-  test-upload:
-    desc: Test PUT /file/{path} endpoint
-    cmds:
-      - curl -X PUT http://127.0.0.1:8080/file/notes/test.md -d "Hello from Taskfile!"
+    test-upload:
+        desc: Test PUT /file/{path} endpoint
+        cmds:
+            - curl -X PUT http://127.0.0.1:8080/file/notes/test.md -d "Hello from Taskfile!"
 
-  test-download:
-    desc: Test GET /file/{path} endpoint
-    cmds:
-      - curl -s http://127.0.0.1:8080/file/notes/welcome.md
+    test-download:
+        desc: Test GET /file/{path} endpoint
+        cmds:
+            - curl -s http://127.0.0.1:8080/file/notes/welcome.md
 
-  test-folder:
-    desc: Test PUT /folder/{path} endpoint
-    cmds:
-      - curl -X PUT http://127.0.0.1:8080/folder/notes/test-folder
+    test-folder:
+        desc: Test PUT /folder/{path} endpoint
+        cmds:
+            - curl -X PUT http://127.0.0.1:8080/folder/notes/test-folder
 
-  test:
-    desc: Run all tests
-    deps:
-      - test-setup
-      - test-status
-      - test-upload
-      - test-download
-      - test-folder
+    test:
+        desc: Run all tests
+        deps:
+            - test-setup
+            - test-status
+            - test-upload
+            - test-download
+            - test-folder
 
-  docker-build:
-    desc: Build Docker image
-    cmds:
-      - docker build -t smartsyncserver .
+    #### DOCKER LOCAL BUILDS ####
+    docker-run:
+        desc: Run in Docker
+        cmds:
+            - docker run -p 8080:8080 -v {{.PWD}}/test-vault:/data/vault smartsyncserver
 
-  docker-run:
-    desc: Run in Docker
-    cmds:
-      - docker run -p 8080:8080 -v {{.PWD}}/test-vault:/data/vault smartsyncserver
+    build-exe-docker:
+        desc: Build the server binary
+        cmds:
+            # - mkdir -p build
+            - GOOS=linux go build -o ./docker/app/smartsyncserver .
 
-  build-exe-docker:
-    desc: Build the server binary
-    cmds:
-      # - mkdir -p build
-      - GOOS=linux go build -o ./docker/app/smartsyncserver .
+    #### BINARY BUILDS ####
+    build-windows:
+        cmds:
+            - go build -o build/smartsyncserver.exe .
+        env:
+            GOOS: windows
+            GOARCH: amd64
+
+    build-linux:
+        cmds:
+            - go build -o build/smartsyncserver .
+        env:
+            GOOS: linux
+            GOARCH: amd64
+
+    build-linux-arm64:
+        cmds:
+            - go build -o build/smartsyncserver-arm64 .
+        env:
+            GOOS: linux
+            GOARCH: arm64
+
+    #### DOCKER BUILD ####
+    docker-build:
+        cmds:
+            - task: build-linux
+            - docker build . -f Dockerfile -t ghcr.io/stefandanzl/smartsyncserver:latest
+
+    docker-build-arm64:
+        cmds:
+            - task: build-linux-arm64
+            - docker build . -f Dockerfile-arm64 -t ghcr.io/stefandanzl/smartsyncserver:latest-arm64
+
+    #### DOCKER PUSH ####
+    docker-push:
+        cmds:
+            - docker push ghcr.io/stefandanzl/smartsyncserver:latest
+
+    docker-push-arm64:
+        cmds:
+            - docker push ghcr.io/stefandanzl/smartsyncserver:latest-arm64
