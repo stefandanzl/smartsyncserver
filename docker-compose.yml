@@ -3,8 +3,10 @@ services:
     build: .
     container_name: smartsyncserver
     restart: unless-stopped
+    environment:
+    - TZ=Europe/Vienna
     ports:
-      - "8080:8080"
+      - "8093:8080"
     volumes:
       # Mount vault data directory
       - ./vault:/vault
