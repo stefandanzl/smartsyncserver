@@ -107,7 +107,7 @@ func main() {
 
 	// Start periodic scanner if enabled
 	if cfg.Scan.PeriodicInterval > 0 {
-		go startPeriodicScan(checksums, cfg.Scan.PeriodicInterval, gitMgr)
+		go startPeriodicScan(checksums, cfg.Scan.PeriodicInterval, vault)
 		// go startPeriodicCommit(checksums, cfg.Git.AutocommitMinutes, gitMgr)
 		log.Printf("Periodic scan started (interval: %d seconds)", cfg.Scan.PeriodicInterval)
 	}
@@ -151,7 +151,7 @@ func main() {
 }
 
 // startPeriodicScan runs periodic vault scans
-func startPeriodicScan(checksums *storage.Checksums, intervalSeconds int, gitMgr *git.Manager) {
+func startPeriodicScan(checksums *storage.Checksums, intervalSeconds int, vault *storage.Vault) {
 	ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
 	defer ticker.Stop()
 
@@ -163,6 +163,13 @@ func startPeriodicScan(checksums *storage.Checksums, intervalSeconds int, gitMgr
 			log.Printf("Periodic scan complete: %d files", checksums.GetFileCount())
 		}
 
+		// Clean empty directories
+		removed, err := vault.CleanEmptyFolders()
+		if err != nil {
+			log.Printf("Error cleaning empty folders: %v", err)
+		} else if removed > 0 {
+			log.Printf("Removed %d empty directories", removed)
+		}
 	}
 }
 

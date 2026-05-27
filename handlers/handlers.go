@@ -263,9 +263,6 @@ func (s *Server) handleCreateFolder(w http.ResponseWriter, r *http.Request, path
 		return
 	}
 
-	// Add directory entry to checksums
-	_ = s.checksums.AddDir(path)
-
 	s.writeJSON(w, map[string]bool{"created": true}, http.StatusOK)
 }
 

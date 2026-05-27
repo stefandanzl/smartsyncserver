@@ -13,12 +13,19 @@ import (
 	"smartsyncserver/ignore"
 )
 
+// FileEntry represents a file with its hash and metadata
+type FileEntry struct {
+	Hash string `json:"hash"`
+	Size int64  `json:"size"`
+	Mtime int64 `json:"mtime"` // seconds since epoch
+}
+
 // Checksums manages the checksums.json file
 type Checksums struct {
 	path      string
 	vaultPath string
 	matcher   *ignore.Matcher
-	data      map[string]string
+	data      map[string]FileEntry
 	mu        sync.RWMutex
 }
 
@@ -28,7 +35,7 @@ func NewChecksums(checksumPath, vaultPath string, matcher *ignore.Matcher) *Chec
 		path:      checksumPath,
 		vaultPath: vaultPath,
 		matcher:   matcher,
-		data:      make(map[string]string),
+		data:      make(map[string]FileEntry),
 	}
 	c.Load()
 	return c
@@ -42,14 +49,14 @@ func (c *Checksums) Load() error {
 	data, err := os.ReadFile(c.path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			c.data = make(map[string]string)
+			c.data = make(map[string]FileEntry)
 			return nil
 		}
 		return err
 	}
 
 	if err := json.Unmarshal(data, &c.data); err != nil {
-		c.data = make(map[string]string)
+		c.data = make(map[string]FileEntry)
 		return err
 	}
 
@@ -80,21 +87,21 @@ func (c *Checksums) Save() error {
 }
 
 // Get returns the checksum for a given path
-func (c *Checksums) Get(path string) (string, bool) {
+func (c *Checksums) Get(path string) (FileEntry, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	sum, ok := c.data[path]
-	return sum, ok
+	entry, ok := c.data[path]
+	return entry, ok
 }
 
 // GetAll returns all checksums
-func (c *Checksums) GetAll() map[string]string {
+func (c *Checksums) GetAll() map[string]FileEntry {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	// Return a copy to prevent race conditions
-	result := make(map[string]string, len(c.data))
+	result := make(map[string]FileEntry, len(c.data))
 	for k, v := range c.data {
 		result[k] = v
 	}
@@ -102,11 +109,11 @@ func (c *Checksums) GetAll() map[string]string {
 }
 
 // Set sets the checksum for a path
-func (c *Checksums) Set(path, checksum string) {
+func (c *Checksums) Set(path string, entry FileEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.data[path] = checksum
+	c.data[path] = entry
 }
 
 // Delete removes a path from checksums
@@ -114,19 +121,7 @@ func (c *Checksums) Delete(path string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Normalize: if deleting a directory, ensure trailing slash
-	deletePath := path
-	if c.data[path+"/"] == "dir" {
-		deletePath = path + "/"
-	}
-	delete(c.data, deletePath)
-
-	// Also remove any nested paths if this was a directory
-	for p := range c.data {
-		if stringsHasPrefix(p, deletePath) && p != deletePath {
-			delete(c.data, p)
-		}
-	}
+	delete(c.data, path)
 }
 
 // Rename updates checksums when a file/folder is renamed
@@ -134,39 +129,18 @@ func (c *Checksums) Rename(from, to string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Normalize paths for directories (ensure trailing slash)
-	fromPath := from
-	toPath := to
-	if c.data[from+"/"] == "dir" {
-		fromPath = from + "/"
-	}
-	// Ensure destination has trailing slash if source was a directory
-	if strings.HasSuffix(fromPath, "/") && !strings.HasSuffix(toPath, "/") {
-		toPath += "/"
-	}
-
-	// Direct file/folder rename
-	if checksum, ok := c.data[fromPath]; ok {
-		c.data[toPath] = checksum
-		delete(c.data, fromPath)
-	}
-
-	// Rename nested paths
-	for path, checksum := range c.data {
-		if stringsHasPrefix(path, fromPath) && path != fromPath {
-			newPath := toPath + path[len(fromPath):]
-			c.data[newPath] = checksum
-			delete(c.data, path)
-		}
+	if entry, ok := c.data[from]; ok {
+		c.data[to] = entry
+		delete(c.data, from)
 	}
 }
 
-// Scan walks the vault and updates checksums for all files and directories
+// Scan walks the vault and updates checksums for all files
 func (c *Checksums) Scan() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	newData := make(map[string]string)
+	newData := make(map[string]FileEntry)
 
 	err := filepath.Walk(c.vaultPath, func(fullPath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -193,13 +167,17 @@ func (c *Checksums) Scan() error {
 			if c.matcher != nil && c.matcher.MatchDir(relPath) {
 				return filepath.SkipDir
 			}
-			// Add directory with pseudo-hash "dir" (paths end with /)
-			newData[relPath+"/"] = "dir"
 			return nil
 		}
 
 		// Check if file should be ignored
 		if c.matcher != nil && c.matcher.Match(relPath) {
+			return nil
+		}
+
+		// Get file info (already have info from Walk, but need stat for metadata)
+		fileInfo, err := os.Stat(fullPath)
+		if err != nil {
 			return nil
 		}
 
@@ -209,7 +187,13 @@ func (c *Checksums) Scan() error {
 			return nil // Skip files that can't be read
 		}
 
-		newData[relPath] = checksum
+		// Create FileEntry with metadata
+		entry := FileEntry{
+			Hash: checksum,
+			Size: fileInfo.Size(),
+			Mtime: fileInfo.ModTime().Unix(),
+		}
+		newData[relPath] = entry
 		return nil
 	})
 
@@ -236,25 +220,25 @@ func (c *Checksums) UpdateForFile(relPath string) error {
 
 	fullPath := filepath.Join(c.vaultPath, relPath)
 
+	// Get file info
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		return err
+	}
+
+	// Calculate checksum
 	checksum, err := calculateFileChecksum(fullPath)
 	if err != nil {
 		return err
 	}
 
-	c.data[relPath] = checksum
-	return c.saveLocked()
-}
-
-// AddDir adds a directory entry with the "dir" pseudo-hash (path ends with /)
-func (c *Checksums) AddDir(relPath string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Ensure trailing slash for directories
-	if !strings.HasSuffix(relPath, "/") {
-		relPath += "/"
+	// Store FileEntry
+	c.data[relPath] = FileEntry{
+		Hash: checksum,
+		Size: info.Size(),
+		Mtime: info.ModTime().Unix(),
 	}
-	c.data[relPath] = "dir"
+
 	return c.saveLocked()
 }
 
