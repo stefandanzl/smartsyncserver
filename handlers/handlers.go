@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"smartsyncserver/auth"
@@ -58,7 +60,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"online":       true,
-		"file_count":   s.checksums.GetFileCount(),
+		"files_total":  s.checksums.GetFileCount(),
 		"auth_success": !s.auth.IsEnabled() || s.auth.ValidateRequest(r),
 		"git_error":    s.git != nil && s.git.GetLastError() != "",
 	}
@@ -77,13 +79,60 @@ func (s *Server) handleChecksums(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleGetChecksums returns all checksums
+// handleGetChecksums returns all checksums, optionally filtered by mtime
 func (s *Server) handleGetChecksums(w http.ResponseWriter, r *http.Request) {
-	allChecksums := s.checksums.GetAll()
-	response := map[string]interface{}{
-		"checksums":  allChecksums,
-		"file_count": len(allChecksums),
+	// Parse since parameter
+	var sinceTime int64
+	var hasFilter bool
+	var filterError string
+
+	sinceParam := r.URL.Query().Get("since")
+	if sinceParam != "" {
+		parsed, err := strconv.ParseInt(sinceParam, 10, 64)
+		if err != nil || parsed < 0 {
+			// Invalid filter - will return all files with error
+			filterError = fmt.Sprintf("Invalid 'since' parameter: must be a non-negative integer, received '%s'", sinceParam)
+		} else {
+			sinceTime = parsed
+			hasFilter = true
+		}
 	}
+
+	// Get all checksums
+	allChecksums := s.checksums.GetAll()
+	totalCount := len(allChecksums)
+
+	// Filter if since parameter is valid
+	if hasFilter {
+		filteredChecksums := make(map[string]storage.FileEntry)
+		for path, entry := range allChecksums {
+			if entry.Mtime >= sinceTime {
+				filteredChecksums[path] = entry
+			}
+		}
+		allChecksums = filteredChecksums
+	}
+
+	// Build response
+	response := map[string]interface{}{}
+	response["checksums"] = allChecksums
+
+	// Add counts and filter info
+	if hasFilter {
+		response["files_total"] = totalCount
+		response["filter"] = map[string]interface{}{
+			"files_filtered": len(allChecksums),
+			"mtime":          sinceTime,
+		}
+	} else if filterError != "" {
+		// Invalid filter - show total count + error
+		response["files_total"] = totalCount
+		response["error"] = filterError
+	} else {
+		// No filter - keep backward compatible (simple number)
+		response["files_total"] = totalCount
+	}
+
 	s.writeJSON(w, response, http.StatusOK)
 }
 
@@ -95,9 +144,9 @@ func (s *Server) handleScanChecksums(w http.ResponseWriter, r *http.Request) {
 	}
 	allChecksums := s.checksums.GetAll()
 	response := map[string]interface{}{
-		"scanned":    true,
-		"file_count": len(allChecksums),
-		"checksums":  allChecksums,
+		"scanned":     true,
+		"files_total": len(allChecksums),
+		"checksums":   allChecksums,
 	}
 	s.writeJSON(w, response, http.StatusOK)
 }
