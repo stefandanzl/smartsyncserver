@@ -72,6 +72,8 @@ func (s *Server) handleChecksums(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		s.handleGetChecksums(w, r)
+	case http.MethodPost:
+		s.handlePostChecksums(w, r)
 	case http.MethodPut:
 		s.handleScanChecksums(w, r)
 	default:
@@ -150,6 +152,75 @@ func (s *Server) handleScanChecksums(w http.ResponseWriter, r *http.Request) {
 	}
 	s.writeJSON(w, response, http.StatusOK)
 }
+
+// handlePostChecksums handles selective checksum queries
+func (s *Server) handlePostChecksums(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Compare  map[string]string `json:"compare"`
+		Paths    []string          `json:"paths"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Handle both fields independently
+	if len(req.Compare) > 0 || len(req.Paths) > 0 {
+		s.handleCombinedChecksums(w, req.Paths, req.Compare)
+	} else {
+		s.writeError(w, "Either 'compare' or 'paths' required", http.StatusBadRequest)
+	}
+}
+
+// handleCombinedChecksums handles both paths and compare in the same request
+func (s *Server) handleCombinedChecksums(w http.ResponseWriter, paths []string, compare map[string]string) {
+	response := make(map[string]any)
+
+	// Handle paths (simple format) - get checksums for requested paths
+	if len(paths) > 0 {
+		checksums := make(map[string]storage.FileEntry)
+		allServerChecksums := s.checksums.GetAll()
+
+		for _, path := range paths {
+			if entry, exists := allServerChecksums[path]; exists {
+				checksums[path] = entry
+			}
+		}
+		response["checksums"] = checksums
+	}
+
+	// Handle compare (compare format) - detect differences
+	if len(compare) > 0 {
+		differing := make(map[string]storage.FileEntry)
+		equal := make(map[string]storage.FileEntry)
+		notfound := make(map[string]any)
+
+		allServerChecksums := s.checksums.GetAll()
+
+		for path, clientHash := range compare {
+			serverEntry, exists := allServerChecksums[path]
+			if !exists {
+				notfound[path] = map[string]string{}
+				continue
+			}
+
+			if serverEntry.Hash == clientHash {
+				equal[path] = serverEntry
+			} else {
+				differing[path] = serverEntry
+			}
+		}
+
+		response["differing"] = differing
+		response["equal"] = equal
+		response["notfound"] = notfound
+	}
+
+	s.writeJSON(w, response, http.StatusOK)
+}
+
 
 // handleSnapshot creates a git commit and pushes to remote
 func (s *Server) handleSnapshot(w http.ResponseWriter, r *http.Request) {
