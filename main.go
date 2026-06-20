@@ -9,6 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// Embed the IANA timezone database so the bare Docker image resolves the TZ
+	// env var without needing tzdata installed in the image.
+	_ "time/tzdata"
 
 	"smartsyncserver/auth"
 	"smartsyncserver/config"

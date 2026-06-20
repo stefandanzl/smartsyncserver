@@ -9,6 +9,17 @@ git:
   # access_token: your-github-token
   # repository_url: https://github.com/username/repo.git
   # commit_message: Automatic SmartSyncServer commit
+  # commit_message supports placeholders expanded at commit time
+  # (times use the server's local timezone, see the TZ env var):
+  #   {date_day}      -> "2026-06-20"     (date)
+  #   {date_time}     -> "2026-06-20 14:30"   (date + time, no seconds)
+  #   {date_daytime}  -> "14:30"          (clock time, no seconds)
+  #   {date_epoch}    -> "1779000000"     (unix seconds)
+  #   {files_total}   -> "5"             (total files in the commit)
+  #   {files_added}   -> "2"             (added, incl. renamed/copied)
+  #   {files_modified}-> "2"             (modified)
+  #   {files_deleted} -> "1"             (deleted)
+  # Example: commit_message: "{date_time} | +{files_added} ~{files_modified} -{files_deleted}"
 
 # Scan settings
 scan:

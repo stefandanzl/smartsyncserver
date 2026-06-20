@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -14,14 +16,14 @@ import (
 
 // Manager handles git operations
 type Manager struct {
-	repoURL      string
+	repoURL       string
 	accessToken   string
-	vaultPath    string
-	commitMsg    string
-	interval     time.Duration
-	ctx          context.Context
-	cancel       context.CancelFunc
-	lastError    string
+	vaultPath     string
+	commitMsg     string
+	interval      time.Duration
+	ctx           context.Context
+	cancel        context.CancelFunc
+	lastError     string
 	lastErrorTime time.Time
 }
 
@@ -42,6 +44,41 @@ func NewManager(repoURL, accessToken, vaultPath, commitMsg string, intervalMinut
 		ctx:         ctx,
 		cancel:      cancel,
 	}
+}
+
+// commitCounts holds per-category file counts for placeholder expansion.
+// Renamed and Copied files are folded into Added; Deleted stands alone.
+type commitCounts struct {
+	total    int
+	added    int
+	modified int
+	deleted  int
+}
+
+// expandCommitMessage expands placeholders in the configured commit message
+// template using the commit time and the file counts. Supported placeholders:
+//
+//	{date_day}      -> "2026-06-20"            (date, server local time)
+//	{date_time}     -> "2026-06-20 14:30"      (date + time, no seconds)
+//	{date_daytime}  -> "14:30"                 (clock time, no seconds)
+//	{date_epoch}    -> "1779000000"            (unix seconds)
+//	{files_total}   -> "5"                     (total files in the commit)
+//	{files_added}   -> "2"                     (added, incl. renamed/copied)
+//	{files_modified}-> "2"                     (modified)
+//	{files_deleted} -> "1"                     (deleted)
+//
+// Times use the server's local timezone (see TZ / time/tzdata).
+func (m *Manager) expandCommitMessage(t time.Time, c commitCounts) string {
+	msg := m.commitMsg
+	msg = strings.ReplaceAll(msg, "{date_day}", t.Format("2006-01-02"))
+	msg = strings.ReplaceAll(msg, "{date_daytime}", t.Format("2006-01-02 15:04"))
+	msg = strings.ReplaceAll(msg, "{date_time}", t.Format("15:04"))
+	msg = strings.ReplaceAll(msg, "{date_epoch}", strconv.FormatInt(t.Unix(), 10))
+	msg = strings.ReplaceAll(msg, "{files_total}", strconv.Itoa(c.total))
+	msg = strings.ReplaceAll(msg, "{files_added}", strconv.Itoa(c.added))
+	msg = strings.ReplaceAll(msg, "{files_modified}", strconv.Itoa(c.modified))
+	msg = strings.ReplaceAll(msg, "{files_deleted}", strconv.Itoa(c.deleted))
+	return msg
 }
 
 // Init initializes the git repository if it doesn't exist
@@ -133,12 +170,28 @@ func (m *Manager) Commit() *CommitResult {
 		files = append(files, path)
 	}
 
-	// Create commit
-	commit, err := worktree.Commit(m.commitMsg, &git.CommitOptions{
+	// Tally per-category counts for placeholder expansion. Renamed and Copied
+	// are folded into Added; Modified and Deleted stand alone.
+	var counts commitCounts
+	counts.total = len(files)
+	for _, fs := range status {
+		switch fs.Staging {
+		case git.Added, git.Renamed, git.Copied:
+			counts.added++
+		case git.Modified:
+			counts.modified++
+		case git.Deleted:
+			counts.deleted++
+		}
+	}
+
+	// Create commit (placeholders in the message are expanded to the commit time)
+	now := time.Now()
+	commit, err := worktree.Commit(m.expandCommitMessage(now, counts), &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  "SmartSyncServer",
 			Email: "smartsyncserver@local",
-			When:  time.Now(),
+			When:  now,
 		},
 	})
 	if err != nil {
